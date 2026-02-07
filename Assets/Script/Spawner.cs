@@ -7,55 +7,74 @@ public class Spawner : MonoBehaviour
     public List<GameObject> item;
     public Highscore highscore;
 
-     [Header("Pengaturan Kesulitan")]
+    [Header("Pengaturan Kesulitan")]
     public float delayAwal = 2.0f;
     public float delayMinimal = 0.5f;
     public float faktorKesulitan = 0.05f;
 
-    
+    [Header("Anti-Overlap")]
+    public float radiusProteksi = 2.0f; // Jarak minimal antar cone
+    public int maksimalPercobaan = 5;
+
     private float timerSpawn;
-    
-    [Header("Events")]
     public UnityEvent OnRandom;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        timerSpawn = delayAwal;
-    }
+    void Start() => timerSpawn = delayAwal;
 
-    // Update is called once per frame
     void Update()
     {
-         timerSpawn -= Time.deltaTime;
-
+        timerSpawn -= Time.deltaTime;
         if (timerSpawn <= 0)
         {
-                SpawnObjectRandom();
-                ResetTimer();
+            SpawnObjectRandom();
+            ResetTimer();
+            OnRandom?.Invoke();
         }
-        OnRandom?.Invoke();
-
     }
+
     void SpawnObjectRandom()
     {
-       Vector3 random = new Vector3();
-       random.x = Random.Range(-10, 10f);
-       random.y = transform.position.y;
+        if (item.Count == 0) return;
 
-        var randomIndex = Random.Range(0, item.Count-1);
-        var randomItem = item[randomIndex];
-        GameObject objekBaru = Instantiate(randomItem, random, Quaternion.identity);
-        objekBaru.transform.SetParent(this.transform);
+        Vector3 spawnPos = Vector3.zero;
+        bool posisiAman = false;
+        int percobaan = 0;
+
+        // Loop untuk mencari posisi yang tidak overlap
+        while (!posisiAman && percobaan < maksimalPercobaan)
+        {
+            float randomX = Random.Range(-15f, 15f);
+            spawnPos = new Vector3(randomX, transform.position.y, 30f);
+
+            // Cek apakah ada Collider dalam radius tertentu di posisi spawnPos
+            // Menggunakan LayerMask jika ingin lebih spesifik (opsional)
+            Collider[] hitColliders = Physics.OverlapSphere(spawnPos, radiusProteksi);
+
+            if (hitColliders.Length == 0)
+            {
+                posisiAman = true;
+            }
+            percobaan++;
+        }
+
+        // Hanya spawn jika ditemukan posisi yang aman
+        if (posisiAman)
+        {
+            int randomIndex = Random.Range(0, item.Count);
+            Instantiate(item[randomIndex], spawnPos, Quaternion.identity, transform);
+            OnRandom?.Invoke();
+        }
     }
 
-     void ResetTimer()
+    void ResetTimer()
     {
-        // Semakin tinggi skor, semakin kecil delay-nya
-        float skorSekarang = highscore.timer;
-        float delayBaru = delayAwal - (skorSekarang * faktorKesulitan);
-        
+        float delayBaru = delayAwal - (highscore.timer * faktorKesulitan);
         timerSpawn = Mathf.Clamp(delayBaru, delayMinimal, delayAwal);
     }
 
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(new Vector3(0, transform.position.y, 30f), radiusProteksi);
+    }
 }

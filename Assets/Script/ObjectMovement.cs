@@ -2,38 +2,53 @@ using UnityEngine;
 
 public class ObjectMovement : MonoBehaviour
 {
-    [Header("Pengaturan Posisi")]
-    public float yAwal = 4f;
-    public float yTarget = 0f;
-    public float kecepatan = 2f;
+[Header("Titik Acuan Z")]
+    public float zMulai = 4f;    // Titik terjauh (saat spawn)
+    public float zSelesai = -2f; // Titik terdekat/melewati kamera
 
-    [Header("Pengaturan Scale")]
-    public float scaleAwal = 0.3f;
-    public float scaleTarget = 1f;
+    [Header("Pengaturan Skala (X & Y)")]
+    public float scaleAwal = 0.3f;  // Skala kecil saat jauh
+    public float scaleTarget = 2.5f; // Skala besar saat dekat
+
+    [Header("Kecepatan")]
+    public float speed = 3f;
+
+    // Variabel untuk mengunci nilai yang ingin tetap
+    private float fixedX;
+    private float fixedY;
+    private float fixedScaleZ;
+
+    void Start()
+    {
+        // Simpan posisi X dan Y awal agar tidak berubah oleh script ini
+        fixedX = transform.position.x;
+        fixedY = transform.position.y;
+        
+        // Simpan skala Z awal agar tetap
+        fixedScaleZ = transform.localScale.z;
+
+        // Set posisi Z awal dan skala awal
+        transform.position = new Vector3(fixedX, fixedY, zMulai);
+        transform.localScale = new Vector3(scaleAwal, scaleAwal, fixedScaleZ);
+    }
 
     void Update()
     {
-        // 1. Gerakkan posisi Y ke bawah
-        float newY = Mathf.MoveTowards(transform.position.y, yTarget, kecepatan * Time.deltaTime);
-        transform.position = new Vector3(transform.position.x, newY, transform.position.z);
+        // 1. Hanya ubah posisi Z (bergerak maju/mendekat)
+        float newZ = transform.position.z - (speed * Time.deltaTime);
+        transform.position = new Vector3(fixedX, fixedY, newZ);
 
-        // 2. Hitung progress (0 sampai 1) berdasarkan jarak yang sudah ditempuh
-        // Kita hitung berapa persen perjalanan dari yAwal ke yTarget
-        float totalJarak = yAwal - yTarget;
-        float jarakSekarang = transform.position.y - yTarget;
-        
-        // InverseLerp akan menghasilkan angka 0 saat di Y=4, dan 1 saat di Y=0
-        float t = Mathf.InverseLerp(yAwal, yTarget, transform.position.y);
+        // 2. Hitung progress (0.0 sampai 1.0) berdasarkan posisi Z
+        float t = Mathf.InverseLerp(zMulai, zSelesai, transform.position.z);
 
-        // 3. Terapkan Scale berdasarkan progress t
+        // 3. Hanya ubah Skala X dan Y, Skala Z tetap sesuai awal
         float currentScale = Mathf.Lerp(scaleAwal, scaleTarget, t);
-        transform.localScale = new Vector3(currentScale, currentScale, 1f);
+        transform.localScale = new Vector3(currentScale, currentScale, fixedScaleZ);
 
-        // 4. (Opsional) Hancurkan objek jika sudah sampai target agar tidak memenuhi memori
-        if (transform.position.y <= yTarget)
+        // 4. Hancurkan jika sudah melewati batas Z selesai
+        if (transform.position.z <= zSelesai)
         {
-            // Tambahkan efek atau hancurkan
-             //Destroy(gameObject); 
+            Destroy(gameObject);
         }
     }
 }
