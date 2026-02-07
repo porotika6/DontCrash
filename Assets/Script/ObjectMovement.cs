@@ -12,6 +12,8 @@ public class ObjectMovement : MonoBehaviour
 
     [Header("Kecepatan")]
     public float speed = 3f;
+    public float risingSpeed = 2f;
+    private Vector3 targetDirection;
 
     // Variabel untuk mengunci nilai yang ingin tetap
     private float fixedX;
@@ -31,24 +33,26 @@ public class ObjectMovement : MonoBehaviour
         transform.position = new Vector3(fixedX, fixedY, zMulai);
         transform.localScale = new Vector3(scaleAwal, scaleAwal, fixedScaleZ);
     }
+    public void SetTargetDirection(float targetX)
+    {
+        // Target posisi di depan (misal Z jauh di depan) dengan variasi X
+        Vector3 targetPos = new Vector3(targetX, transform.position.y, transform.position.z - 50f);
+        targetDirection = (targetPos - transform.position).normalized;
+    }
 
     void Update()
     {
-        // 1. Hanya ubah posisi Z (bergerak maju/mendekat)
-        float newZ = transform.position.z - (speed * Time.deltaTime);
-        transform.position = new Vector3(fixedX, fixedY, newZ);
+        transform.Translate(targetDirection * speed * Time.deltaTime * risingSpeed, Space.World);
 
-        // 2. Hitung progress (0.0 sampai 1.0) berdasarkan posisi Z
-        float t = Mathf.InverseLerp(zMulai, zSelesai, transform.position.z);
-
-        // 3. Hanya ubah Skala X dan Y, Skala Z tetap sesuai awal
-        float currentScale = Mathf.Lerp(scaleAwal, scaleTarget, t);
-        transform.localScale = new Vector3(currentScale, currentScale, fixedScaleZ);
-
-        // 4. Hancurkan jika sudah melewati batas Z selesai
-        if (transform.position.z <= zSelesai)
+        float progress = Mathf.InverseLerp(zMulai, zSelesai, transform.position.z);
+        
+        float currentScale = Mathf.Lerp(scaleAwal, scaleTarget, progress);
+        transform.localScale = new Vector3(currentScale, currentScale, transform.localScale.z);
+        // Opsional: Agar objek menghadap ke arah jalannya
+        if (targetDirection != Vector3.zero)
         {
-            Destroy(gameObject);
+            transform.forward = targetDirection;
         }
     }
+    
 }
