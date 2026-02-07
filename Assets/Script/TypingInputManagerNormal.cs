@@ -1,13 +1,13 @@
-using System;
 using UnityEngine;
 
-public class TypingInputManager : MonoBehaviour
+public class TypingInputManagerNormal : MonoBehaviour
 {
+    public KeyboardNormalSystem keyboard;
     public TypingGameManagerNormal gameManager;
 
     void Update()
     {
-        if (gameManager == null)
+        if (keyboard == null || gameManager == null)
             return;
 
         // BACKSPACE
@@ -24,25 +24,13 @@ public class TypingInputManager : MonoBehaviour
         if (string.IsNullOrEmpty(input))
             return;
 
-        char c = input[0];
+        char raw = input[0];
 
         // TERIMA HURUF & SPASI
-        if (char.IsLetter(c) || c == ' ')
-        {
-            gameManager.ReceiveChar(c);
-        }
-    }
-}
+        if (!char.IsLetter(raw) && raw != ' ')
+            return;
 
-public class TypingGameManagerNormal
-{
-    internal void HandleBackspace()
-    {
-        throw new NotImplementedException();
-    }
-
-    internal void ReceiveChar(char c)
-    {
-        throw new NotImplementedException();
+        char resolved = keyboard.Resolve(raw);
+        gameManager.ReceiveChar(resolved);
     }
 }
