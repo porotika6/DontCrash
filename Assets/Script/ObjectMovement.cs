@@ -2,57 +2,66 @@ using UnityEngine;
 
 public class ObjectMovement : MonoBehaviour
 {
-[Header("Titik Acuan Z")]
-    public float zMulai = 4f;    // Titik terjauh (saat spawn)
-    public float zSelesai = -2f; // Titik terdekat/melewati kamera
+    [Header("Titik Acuan Z")]
+    public float zMulai = 100f;   // Z tempat spawn (Jauh di sana)
+    public float zSelesai = -10f; // Z tempat hilang (Di belakang kamera)
 
-    [Header("Pengaturan Skala (X & Y)")]
-    public float scaleAwal = 0.3f;  // Skala kecil saat jauh
-    public float scaleTarget = 2.5f; // Skala besar saat dekat
+    [Header("Pengaturan Skala")]
+    public float scaleAwal = 0.1f;   // Kecil banget pas jauh
+    public float scaleTarget = 2.5f; // Besar pas nabrak kamera
 
     [Header("Kecepatan")]
-    public float speed = 3f;
-    public float risingSpeed = 2f;
-    private Vector3 targetDirection;
+    public float speed = 20f; // Kecepatan gerak di sumbu Z
 
-    // Variabel untuk mengunci nilai yang ingin tetap
-    private float fixedX;
+    // Variabel posisi
+    private float startX; // X saat spawn
+    private float targetX; // X saat sampai di depan kamera
     private float fixedY;
-    private float fixedScaleZ;
+    
+    private bool isInitialized = false;
 
-    void Start()
+    // Fungsi ini dipanggil oleh SpawnManager
+    public void InitializeMovement(float _startX, float _targetX)
     {
-        // Simpan posisi X dan Y awal agar tidak berubah oleh script ini
-        fixedX = transform.position.x;
+        startX = _startX;
+        targetX = _targetX;
         fixedY = transform.position.y;
         
-        // Simpan skala Z awal agar tetap
-        fixedScaleZ = transform.localScale.z;
-
-        // Set posisi Z awal dan skala awal
-        transform.position = new Vector3(fixedX, fixedY, zMulai);
-        transform.localScale = new Vector3(scaleAwal, scaleAwal, fixedScaleZ);
-    }
-    public void SetTargetDirection(float targetX)
-    {
-        // Target posisi di depan (misal Z jauh di depan) dengan variasi X
-        Vector3 targetPos = new Vector3(targetX, transform.position.y, transform.position.z - 50f);
-        targetDirection = (targetPos - transform.position).normalized;
+        // Pastikan posisi Z diset ke zMulai saat inisialisasi
+        transform.position = new Vector3(startX, fixedY, zMulai);
+        
+        isInitialized = true;
     }
 
     void Update()
     {
-        transform.Translate(targetDirection * speed * Time.deltaTime * risingSpeed, Space.World);
+        // Jangan jalan kalau belum di-setup oleh Spawner
+        if (!isInitialized) return;
 
-        float progress = Mathf.InverseLerp(zMulai, zSelesai, transform.position.z);
+        // 1. Gerakkan Z mundur (Mendekati kamera)
+        // Kita gerakkan posisi Z objek secara manual
+        Vector3 currentPos = transform.position;
+        currentPos.z -= speed * Time.deltaTime;
         
+        // 2. Hitung "Progress" perjalanan (0.0 = di Start, 1.0 = di Selesai)
+        // InverseLerp menghitung persentase posisi Z saat ini di antara zMulai dan zSelesai
+        float progress = Mathf.InverseLerp(zMulai, zSelesai, currentPos.z);
+
+        // 3. Interpolasi X (Agar geraknya miring mengikuti perspektif)
+        // Saat progress 0 (jauh), X = startX. Saat progress 1 (dekat), X = targetX.
+        currentPos.x = Mathf.Lerp(startX, targetX, progress);
+
+        // Terapkan posisi baru
+        transform.position = currentPos;
+
+        // 4. Interpolasi Skala (Membesar saat mendekat)
         float currentScale = Mathf.Lerp(scaleAwal, scaleTarget, progress);
-        transform.localScale = new Vector3(currentScale, currentScale, transform.localScale.z);
-        // Opsional: Agar objek menghadap ke arah jalannya
-        if (targetDirection != Vector3.zero)
+        transform.localScale = new Vector3(currentScale, currentScale, currentScale); // Z scale juga ikut membesar agar proporsional
+
+        // Opsional: Jika objek sudah lewat jauh di belakang kamera, hancurkan
+        if (currentPos.z < zSelesai)
         {
-            transform.forward = targetDirection;
+            //Destroy(gameObject);
         }
     }
-    
 }

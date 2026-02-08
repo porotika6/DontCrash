@@ -163,16 +163,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0456636dd0adc9243acc7ca76f417a0f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TypingInputManager
-  targetText: {fileID: 1913155190}
-  typingBufferText: {fileID: 1837546536}
-  sentences:
-  - Hey did you know that its my birthday
-  - Got something to tell you
-  - Got something to say
-  - Bro i think my cat ate my homework
-  - Typing this while driving doesnt feel safe lol
-  - Bro i think my cat ate my homework
-  - Baby why arent you replying
+  mahjong: {fileID: 918951872}
+  gameManager: {fileID: 1327137016}
 --- !u!1 &918951870
 GameObject:
   m_ObjectHideFlags: 0

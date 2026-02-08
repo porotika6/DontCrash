@@ -1,22 +1,36 @@
 using UnityEngine;
-using System.Collections.Generic; // Supaya bisa pakai List
+using System.Collections.Generic;
 
 public class SpawnManager : MonoBehaviour
 {
-    [Header("Daftar Obstacle (Bisa diisi Cone, Box, dll)")]
-    public List<GameObject> obstaclePrefabs; 
+    [Header("Daftar Obstacle")]
+    public List<GameObject> obstaclePrefabs;
 
-    [Header("Daftar Jalur (Bisa ditambah/dikurang sesuka hati)")]
-    public List<Transform> laneAnchors; 
+    [Header("Daftar Jalur (Titik Awal Spawn)")]
+    // Pastikan Anchor ini posisinya ada di Z JAUH (misal Z = 100) dan X = 0 (Tengah)
+    // Atau X sesuai jalur jika ingin jalur sejajar.
+    public List<Transform> laneAnchors;
+
+    [Header("Pengaturan Target Jalur (X Akhir)")]
+    // Ini menggantikan if-else hardcoded kamu. Isi di Inspector!
+    // Element 0 = Jalur Kiri, Element 1 = Tengah, Element 2 = Kanan
+    public List<Vector2> laneTargetRanges; 
+    // Contoh isi di Inspector untuk 3 jalur:
+    // Element 0 (Kiri): X min -54, X max -25
+    // Element 1 (Tengah): X min -22, X max 20
+    // Element 2 (Kanan): X min 22, X max 53
 
     [Header("Pengaturan Spawn")]
-    public float spawnInterval = 1.5f; // Jeda waktu muncul
+    public float spawnInterval = 1.5f;
     private float timer;
+
+    [Header("Anti-Overlap")]
+    public float jarakMinimal = 5.0f;
+    public int maksimalPercobaan = 3;
 
     void Update()
     {
         timer += Time.deltaTime;
-
         if (timer >= spawnInterval)
         {
             SpawnSomething();
@@ -26,52 +40,65 @@ public class SpawnManager : MonoBehaviour
 
     void SpawnSomething()
     {
-        // Cek dulu apakah list sudah diisi atau belum, biar tidak Error
-        if (obstaclePrefabs.Count == 0 || laneAnchors.Count == 0)
-        {
-            Debug.LogError("List Obstacle atau Lane masih kosong! Isi dulu di Inspector.");
-            return;
-        }
+        if (obstaclePrefabs.Count == 0 || laneAnchors.Count == 0) return;
 
-        // 1. Pilih Obstacle secara acak dari list
+        bool berhasilSpawn = false;
+        int percobaan = 0;
+
+        while (!berhasilSpawn && percobaan < maksimalPercobaan)
+        {
+            int randomLaneIndex = Random.Range(0, laneAnchors.Count);
+            Transform chosenAnchor = laneAnchors[randomLaneIndex];
+
+            // Cek Overlap
+            Collider[] hitColliders = Physics.OverlapSphere(chosenAnchor.position, jarakMinimal);
+
+            if (hitColliders.Length == 0)
+            {
+                ExecuteSpawn(chosenAnchor, randomLaneIndex);
+                berhasilSpawn = true;
+            }
+            
+            percobaan++;
+        }
+    }
+
+    void ExecuteSpawn(Transform chosenAnchor, int laneIndex)
+    {
         int randomObstacleIndex = Random.Range(0, obstaclePrefabs.Count);
         GameObject chosenObstacle = obstaclePrefabs[randomObstacleIndex];
 
-        // 2. Pilih Jalur secara acak dari list anchor
-        int randomLaneIndex = Random.Range(0, laneAnchors.Count);
-        Transform chosenAnchor = laneAnchors[randomLaneIndex];
+        // Instantiate di posisi Anchor (Posisi Awal)
+        GameObject clone = Instantiate(chosenObstacle, chosenAnchor.position, Quaternion.identity);
 
-        float minX, maxX;
-        if (randomLaneIndex == 0)
+        // Hitung Target X (Posisi Akhir di depan kamera)
+        float targetX = 0;
+        
+        // Mengambil data range dari List laneTargetRanges agar lebih rapi
+        if (laneIndex < laneTargetRanges.Count)
         {
-            minX= -54;
-            maxX= -25;
-        }
-        else if (randomLaneIndex == 1)
-        {
-            minX= -22;
-            maxX= 20;
-        }
-        else
-        {
-            minX= 22;
-            maxX= 53;
+            Vector2 range = laneTargetRanges[laneIndex];
+            targetX = Random.Range(range.x, range.y);
         }
 
-        var pos = chosenAnchor.position;
-        float targetX = Random.Range(minX, maxX);
-
-        // 3. Eksekusi pemunculan
-       GameObject clone = Instantiate(chosenObstacle, chosenAnchor.position, chosenAnchor.rotation);
-
-        // 2. Beritahu si klon ke arah mana dia harus bergerak
+        // Setup Script Pergerakan
         ObjectMovement moveScript = clone.GetComponent<ObjectMovement>();
         if (moveScript != null)
         {
-            moveScript.SetTargetDirection(targetX);
+            // Kita kirim Posisi Awal (Anchor X) dan Posisi Akhir (Target X)
+            moveScript.InitializeMovement(chosenAnchor.position.x, targetX);
         }
 
-        // 3. Hancurkan klon setelah 5 detik agar tidak menumpuk (Opsional)
-        Destroy(clone, 16f);
+        Destroy(clone, 15f); // Hancurkan setelah lama
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        if (laneAnchors == null) return;
+        Gizmos.color = Color.yellow;
+        foreach (var anchor in laneAnchors)
+        {
+            if (anchor != null) Gizmos.DrawWireSphere(anchor.position, jarakMinimal);
+        }
     }
 }
