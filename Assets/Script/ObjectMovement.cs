@@ -61,7 +61,7 @@ public class ObjectMovement : MonoBehaviour
         // Opsional: Jika objek sudah lewat jauh di belakang kamera, hancurkan
         if (currentPos.z < zSelesai)
         {
-            //Destroy(gameObject);
+            Destroy(gameObject);
         }
     }
 }

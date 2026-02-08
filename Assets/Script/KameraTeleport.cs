@@ -1,80 +1,76 @@
 using UnityEngine;
 using System.Collections;
-using UnityEngine.UI;
 using System.Collections.Generic;
-public class KameraTeleport : MonoBehaviour
+using UnityEngine.UI;
+
+public class CameraTeleportSystem : MonoBehaviour
 {
-   [Header("Deteksi Obstacle")]
-    public float detectionDistance = 10f; // Jarak obstacle terdeteksi
-    public LayerMask obstacleLayer;       // Layer khusus Obstacle agar raycast akurat
-    public string obstacleTag = "Obstacle"; // Tag obstacle (opsional, untuk double check)
+    [Header("Deteksi Obstacle (SphereCast)")]
+    public float detectionDistance = 15f; 
+    public float sphereRadius = 2.0f;      // "Ketebalan" laser bola kamu
+    public LayerMask obstacleLayer;       
+    public string obstacleTag = "Obstacle"; 
 
     [Header("Slow Motion Settings")]
-    public float slowMotionFactor = 0.1f; // Seberapa lambat waktu berjalan (0.1 = 10% speed)
-    public GameObject teleportUIPanel;    // Panel UI yang berisi tombol Kiri/Kanan
+    [Range(0f, 1f)] 
+    public float slowMotionFactor = 0.2f; // Pastikan di bawah 1 (0.2 = 20% kecepatan)
+    public GameObject teleportUIPanel;    
 
-    [Header("Teleport Settings")]
-    public float teleportDistance = 5f;   // Seberapa jauh pindah ke samping
-    public float transitionDuration = 0.3f; // Durasi animasi pindah (detik)
+    [Header("Teleport Lane Settings")]
+    public List<Transform> cameraLaneAnchors; // Masukkan 3 Objek (Kiri, Tengah, Kanan)
+    public int currentLaneIndex = 1;         // Index 1 adalah Tengah
+    public float transitionDuration = 0.3f;
 
     private bool isSlowMotion = false;
     private bool isMoving = false;
     private float defaultFixedDeltaTime;
 
-    [Header("Teleport Lane Settings")]
-    public List<Transform> cameraLaneAnchors; // Masukkan 3 Transform (Kiri, Tengah, Kanan)
-    public int currentLaneIndex = 1;
-
     void Start()
     {
-        // Simpan default physics speed
         defaultFixedDeltaTime = Time.fixedDeltaTime;
         
-        // Pastikan UI mati saat mulai
+        // Atur posisi awal kamera ke anchor tengah saat start
+        if (cameraLaneAnchors.Count > currentLaneIndex)
+            transform.position = new Vector3(cameraLaneAnchors[currentLaneIndex].position.x, transform.position.y, transform.position.z);
+
         if (teleportUIPanel != null) 
             teleportUIPanel.SetActive(false);
     }
 
     void Update()
     {
-        // Jangan deteksi jika sedang slow motion atau sedang bergerak
         if (!isSlowMotion && !isMoving)
         {
             DetectObstacle();
         }
     }
 
-    // --- LOGIKA DETEKSI ---
     void DetectObstacle()
     {
-       Vector3 origin = transform.position;
-    Vector3 direction = transform.forward;
+        Vector3 origin = transform.position;
+        Vector3 direction = transform.forward;
+        RaycastHit hit;
 
-    RaycastHit hit;
-    float sphereRadius = 3f; // Ukuran "bola" laser, perbesar jika masih tidak kena
+        // Visualisasi Laser di Scene View (Biar kelihatan lasernya)
+        Debug.DrawRay(origin, direction * detectionDistance, Color.red);
 
-    // Visualisasi laser di Scene View (Tekan Play untuk melihat)
-    Debug.DrawRay(origin, direction * detectionDistance, Color.red);
-
-    // Gunakan SphereCast agar area deteksi lebih gemuk/lebar
-    if (Physics.SphereCast(origin, sphereRadius, direction, out hit, detectionDistance, obstacleLayer))
-    {
-        if (hit.collider.CompareTag(obstacleTag))
+        // MENGGUNAKAN SPHERECAST agar tidak meleset
+        if (Physics.SphereCast(origin, sphereRadius, direction, out hit, detectionDistance, obstacleLayer))
         {
-            StartSlowMotion();
-            Debug.Log("Obstacle Terdeteksi: " + hit.collider.name);
+            if (hit.collider.CompareTag(obstacleTag))
+            {
+                Debug.Log("Obstacle terdeteksi: " + hit.collider.name);
+                StartSlowMotion();
+            }
         }
     }
-    }
 
-    // --- LOGIKA SLOW MOTION ---
     void StartSlowMotion()
     {
         isSlowMotion = true;
         Time.timeScale = slowMotionFactor;
-        Time.fixedDeltaTime = defaultFixedDeltaTime * Time.timeScale; // Agar physics tetap halus
+        Time.fixedDeltaTime = defaultFixedDeltaTime * Time.timeScale; 
 
-        // Munculkan UI Tombol
         if (teleportUIPanel != null) 
             teleportUIPanel.SetActive(true);
     }
@@ -85,50 +81,56 @@ public class KameraTeleport : MonoBehaviour
         Time.timeScale = 1f;
         Time.fixedDeltaTime = defaultFixedDeltaTime;
 
-        // Sembunyikan UI Tombol
         if (teleportUIPanel != null) 
             teleportUIPanel.SetActive(false);
     }
 
-    // --- FUNGSI TOMBOL UI ---
-    // Pasang function ini di tombol UI "Kiri"
-   public void OnClickTeleportLeft()
-{
-    if (isMoving || currentLaneIndex <= 0) return; // Jangan pindah jika sudah di paling kiri
-    
-    currentLaneIndex--; // Pindah index ke kiri
-    StopSlowMotion();
-    StartCoroutine(TransitionToAnchor(cameraLaneAnchors[currentLaneIndex].position));
-}
+    // --- FUNGSI TOMBOL ---
 
-public void OnClickTeleportRight()
-{
-    if (isMoving || currentLaneIndex >= cameraLaneAnchors.Count - 1) return; // Jangan jika sudah paling kanan
-    
-    currentLaneIndex++; // Pindah index ke kanan
-    StopSlowMotion();
-    StartCoroutine(TransitionToAnchor(cameraLaneAnchors[currentLaneIndex].position));
-    }
-
-    // --- LOGIKA TRANSISI GERAK (Smooth) ---
-IEnumerator TransitionToAnchor(Vector3 targetPos)
-{
-    isMoving = true;
-    Vector3 startPos = transform.position;
-    
-    // Kita hanya ingin pindah posisi X, posisi Y dan Z tetap ikuti kamera asal
-    Vector3 finalTarget = new Vector3(targetPos.x, startPos.y, startPos.z);
-    
-    float elapsedTime = 0;
-    while (elapsedTime < transitionDuration)
+    public void OnClickTeleportLeft()
     {
-        // Pindah secara halus
-        transform.position = Vector3.Lerp(startPos, finalTarget, elapsedTime / transitionDuration);
-        elapsedTime += Time.deltaTime;
-        yield return null;
+        if (isMoving || currentLaneIndex <= 0) return;
+        
+        currentLaneIndex--; 
+        StopSlowMotion();
+        StartCoroutine(TransitionToAnchor(cameraLaneAnchors[currentLaneIndex].position));
     }
 
-    transform.position = finalTarget;
-    isMoving = false;
-}
+    public void OnClickTeleportRight()
+    {
+        if (isMoving || currentLaneIndex >= cameraLaneAnchors.Count - 1) return;
+        
+        currentLaneIndex++; 
+        StopSlowMotion();
+        StartCoroutine(TransitionToAnchor(cameraLaneAnchors[currentLaneIndex].position));
+    }
+
+    IEnumerator TransitionToAnchor(Vector3 targetPos)
+    {
+        isMoving = true;
+        Vector3 startPos = transform.position;
+        
+        // Kita hanya ambil X dari anchor, Y dan Z tetap posisi kamera sekarang
+        Vector3 finalTarget = new Vector3(targetPos.x, startPos.y, startPos.z);
+        
+        float elapsedTime = 0;
+        while (elapsedTime < transitionDuration)
+        {
+            // Pindah halus menggunakan Lerp
+            // Gunakan Time.unscaledDeltaTime karena Time.timeScale mungkin sedang berubah
+            transform.position = Vector3.Lerp(startPos, finalTarget, elapsedTime / transitionDuration);
+            elapsedTime += Time.unscaledDeltaTime; 
+            yield return null;
+        }
+
+        transform.position = finalTarget;
+        isMoving = false;
+    }
+
+    // Gambar bola deteksi di editor agar kamu bisa lihat seberapa besar lasernya
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position + transform.forward * detectionDistance, sphereRadius);
+    }
 }
